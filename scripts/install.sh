@@ -13,6 +13,20 @@ install_binary() {
     case ${OS} in
         Linux|Darwin)
             echo "Detected ${OS}. Installing to ${INSTALL_DIR}"
+            if [ "${OS}" == "Linux" ]; then
+                if [ -f "/proc/version" ]; then
+                    PROC_VERSION=$(cat /proc/version)
+                    if echo "${PROC_VERSION}" | grep -qi "microsoft"; then
+                        if echo "${PROC_VERSION}" | grep -qi "WSL2"; then
+                            echo "Running on WSL2."
+                        else
+                            echo "Running on WSL1."
+                        fi
+                    else
+                        echo "Running on native Linux."
+                    fi
+                fi
+            fi
             if [ ! -d "${INSTALL_DIR}" ]; then
                 echo "Creating directory ${INSTALL_DIR}"
                 mkdir -p "${INSTALL_DIR}"
