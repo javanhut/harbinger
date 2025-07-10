@@ -4,15 +4,19 @@ A Git conflict monitoring tool that watches your repository in the background an
 
 ## Features
 
-- **Automatic Monitoring**: Polls your Git repository for remote changes
+- **Automatic Monitoring**: Continuously polls your Git repository for remote changes
 - **Smart Notifications**: Get notified when:
   - Your branch is out of sync with remote
   - Remote branch has new commits
   - Potential merge conflicts are detected
+- **Background Processing**: Run monitors in the background with `--detach` flag
 - **Interactive Conflict Resolution**: Terminal-based UI for resolving conflicts
-  - Accept yours or theirs
+  - Color-coded conflict sections (yours vs. theirs)
+  - Accept yours or theirs with one keystroke
   - Edit conflicts in your favorite editor
-  - View only the conflicting sections
+  - Skip files to resolve later
+  - Automatic staging of resolved files
+- **Configurable**: Control automatic vs. manual conflict resolution
 - **Cross-Platform**: Works on macOS, Linux, and Windows
 
 ## Installation
@@ -43,25 +47,110 @@ make install
 docker run -v $(pwd):/workspace javanhut/harbinger monitor
 ```
 
+## Quick Start
+
+### 1. Start monitoring your repository
+
+```bash
+# Monitor current repository in foreground
+harbinger monitor
+
+# Or run in background (recommended)
+harbinger monitor --detach
+```
+
+### 2. When conflicts are detected
+
+Harbinger will automatically launch the conflict resolution UI (if `auto_resolve: true` in config) or notify you to run:
+
+```bash
+harbinger resolve
+```
+
+### 3. Stop background monitoring
+
+```bash
+harbinger stop
+```
+
 ## Usage
 
-### Start monitoring the current repository
+### Basic Commands
+
+| Command | Description |
+|---------|-------------|
+| `harbinger monitor` | Start monitoring current repository |
+| `harbinger monitor -d` | Start monitoring in background |
+| `harbinger stop` | Stop background monitors |
+| `harbinger resolve` | Manually resolve conflicts |
+
+### Monitor Options
 
 ```bash
-harbinger monitor
-```
-
-### Monitor with custom interval
-
-```bash
+# Custom polling interval
 harbinger monitor --interval 1m
-```
 
-### Monitor a specific repository
-
-```bash
+# Monitor specific repository
 harbinger monitor --path /path/to/repo
+
+# Background with custom settings
+harbinger monitor --detach --interval 30s --path /path/to/repo
 ```
+
+## Conflict Resolution
+
+Harbinger provides a powerful interactive terminal UI for resolving merge conflicts efficiently.
+
+### Two Resolution Modes
+
+| Mode | Trigger | Configuration |
+|------|---------|---------------|
+| **Automatic** | Conflicts detected during monitoring | `auto_resolve: true` (default) |
+| **Manual** | Run `harbinger resolve` command | `auto_resolve: false` or anytime |
+
+### Interactive UI Walkthrough
+
+When conflicts are detected, harbinger displays:
+
+```
+=== Conflict Resolution (1/3) ===
+File: src/main.go
+
+<<<<<<< YOURS
+func main() {
+    fmt.Println("Hello from your branch")
+}
+>>>>>>> THEIRS
+func main() {
+    fmt.Println("Hello from remote branch")
+}
+
+--------------------------------------------------
+Choose an option:
+  [1] Accept yours
+  [2] Accept theirs  
+  [3] Edit in your editor
+  [4] Skip this file
+
+Your choice: 
+```
+
+### Resolution Options
+
+| Option | Action | Result |
+|--------|--------|--------|
+| **[1] Accept yours** | Keep your local changes | Runs `git checkout --ours <file>` |
+| **[2] Accept theirs** | Accept incoming changes | Runs `git checkout --theirs <file>` |
+| **[3] Edit in editor** | Open file in `$EDITOR` | Manual editing + auto-staging |
+| **[4] Skip this file** | Leave unresolved | Continue to next conflict |
+
+### Key Features
+
+- **Color-coded sections**: Green for yours, red for theirs
+- **Automatic staging**: Resolved files are staged automatically
+- **Fast navigation**: Process multiple conflicts quickly
+- **Resumable**: Skip files and come back later
+- **Editor integration**: Uses your preferred editor (`$EDITOR`)
 
 ## Configuration
 
@@ -71,9 +160,136 @@ Create a configuration file at `~/.harbinger.yaml`:
 poll_interval: 30s
 editor: vim
 notifications: true
+auto_resolve: true
 ignore_branches:
   - main
   - master
+```
+
+### Configuration Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `poll_interval` | duration | `30s` | How often to check for remote changes |
+| `editor` | string | `$EDITOR` | External editor for conflict resolution |
+| `notifications` | boolean | `true` | Enable/disable system notifications |
+| `auto_resolve` | boolean | `true` | Auto-launch conflict resolution UI |
+| `ignore_branches` | array | `[]` | List of branches to skip monitoring |
+
+### Example Configurations
+
+**Minimal monitoring (manual resolution only):**
+```yaml
+auto_resolve: false
+notifications: false
+```
+
+**High-frequency monitoring:**
+```yaml
+poll_interval: 10s
+auto_resolve: true
+editor: code
+```
+
+**Production-safe monitoring:**
+```yaml
+poll_interval: 5m
+auto_resolve: false
+ignore_branches:
+  - main
+  - master
+  - production
+```
+
+## Common Workflows
+
+### Developer Workflow
+
+```bash
+# Start monitoring in background when you begin work
+harbinger monitor -d
+
+# Work on your feature branch
+git checkout feature/new-feature
+# ... make changes ...
+
+# Harbinger notifies you of conflicts when they're detected
+# Resolve automatically or manually
+harbinger resolve
+
+# Stop monitoring when done
+harbinger stop
+```
+
+### CI/CD Integration
+
+```bash
+# Check for conflicts before merging
+harbinger resolve --dry-run  # (future feature)
+
+# Or monitor specific branches
+harbinger monitor --path /path/to/repo --interval 1m
+```
+
+### Team Collaboration
+
+```bash
+# Each team member monitors their branch
+harbinger monitor -d
+
+# Conflicts are resolved immediately when detected
+# No more "merge conflict" surprises during PRs
+```
+
+## Troubleshooting
+
+### Common Issues
+
+**Issue: "not a git repository"**
+```bash
+# Ensure you're in a git repository
+git status
+
+# Or specify the repository path
+harbinger monitor --path /path/to/your/repo
+```
+
+**Issue: "No background harbinger monitor found"**
+```bash
+# Check if monitor is running
+ps aux | grep harbinger
+
+# Start a new monitor
+harbinger monitor -d
+```
+
+**Issue: "Conflicts not detected"**
+```bash
+# Ensure you have remote tracking set up
+git remote -v
+git branch -vv
+
+# Manually fetch to test
+git fetch --all
+```
+
+**Issue: "Editor not opening"**
+```bash
+# Check your EDITOR environment variable
+echo $EDITOR
+
+# Or set it in config
+echo "editor: code" >> ~/.harbinger.yaml
+```
+
+### Debug Mode
+
+```bash
+# Enable verbose logging (future feature)
+harbinger monitor --verbose
+
+# Check logs
+tail -f ~/.harbinger.log
 ```
 
 ## How It Works
@@ -207,12 +423,11 @@ The configuration is loaded in the following priority order:
 4. Default values (lowest priority)
 
 Configuration options:
-- `poll_interval`: How often to check for changes
-- `editor`: External editor for conflict resolution
-- `notifications`: Enable/disable system notifications
-- `ignore_branches`: List of branches to skip monitoring
-- `auto_fetch`: Automatically fetch before monitoring
-- `conflict_strategy`: Default conflict resolution strategy
+- `poll_interval`: How often to check for changes (default: 30s)
+- `editor`: External editor for conflict resolution (default: $EDITOR)
+- `notifications`: Enable/disable system notifications (default: true)
+- `auto_resolve`: Automatically launch conflict resolution UI when conflicts are detected (default: true)
+- `ignore_branches`: List of branches to skip monitoring (default: empty)
 
 ### Error Handling
 

@@ -12,6 +12,7 @@ type Config struct {
 	Editor         string   `yaml:"editor"`
 	Notifications  bool     `yaml:"notifications"`
 	IgnoreBranches []string `yaml:"ignore_branches"`
+	AutoResolve    bool     `yaml:"auto_resolve"`
 }
 
 var (
@@ -37,6 +38,7 @@ func Load() (*Config, error) {
 		PollInterval:  "30s",
 		Editor:        os.Getenv("EDITOR"),
 		Notifications: true,
+		AutoResolve:   true,
 	}
 
 	if configPath == "" || configName == "" {

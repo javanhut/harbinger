@@ -10,6 +10,7 @@ import (
 	"github.com/javanhut/harbinger/internal/conflict"
 	"github.com/javanhut/harbinger/internal/git"
 	"github.com/javanhut/harbinger/internal/notify"
+	"github.com/javanhut/harbinger/pkg/config"
 )
 
 type Options struct {
@@ -20,6 +21,7 @@ type Monitor struct {
 	repo             *git.Repository
 	options          Options
 	notifier         *notify.Notifier
+	config           *config.Config
 	ctx              context.Context
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
@@ -32,6 +34,11 @@ func New(repoPath string, options Options) (*Monitor, error) {
 		return nil, fmt.Errorf("failed to initialize repository: %w", err)
 	}
 
+	cfg, err := config.Load()
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
 	notifier := notify.New()
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -40,6 +47,7 @@ func New(repoPath string, options Options) (*Monitor, error) {
 		repo:     repo,
 		options:  options,
 		notifier: notifier,
+		config:   cfg,
 		ctx:      ctx,
 		cancel:   cancel,
 	}, nil
@@ -141,9 +149,14 @@ func (m *Monitor) checkForChanges() error {
 func (m *Monitor) handleConflicts(conflicts []git.Conflict) {
 	m.notifier.NotifyConflicts(len(conflicts))
 
-	// Launch conflict resolution UI
-	resolver := conflict.NewResolver(m.repo)
-	if err := resolver.ResolveConflicts(conflicts); err != nil {
-		log.Printf("Error resolving conflicts: %v", err)
+	// Only launch conflict resolution UI if auto_resolve is enabled
+	if m.config.AutoResolve {
+		log.Println("Auto-resolving conflicts (use 'harbinger resolve' to manually resolve)")
+		resolver := conflict.NewResolver(m.repo)
+		if err := resolver.ResolveConflicts(conflicts); err != nil {
+			log.Printf("Error resolving conflicts: %v", err)
+		}
+	} else {
+		log.Println("Conflicts detected. Use 'harbinger resolve' to manually resolve them.")
 	}
 }

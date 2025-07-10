@@ -140,6 +140,25 @@ func (r *Repository) getFileConflict(file string) (*Conflict, error) {
 	}, nil
 }
 
+func (r *Repository) GetConflictedFiles() ([]string, error) {
+	cmd := exec.Command("git", "diff", "--name-only", "--diff-filter=U")
+	cmd.Dir = r.Path
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get conflicted files: %w", err)
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	var files []string
+	for _, file := range lines {
+		if file != "" {
+			files = append(files, file)
+		}
+	}
+
+	return files, nil
+}
+
 type Conflict struct {
 	File    string
 	Content string
