@@ -80,7 +80,8 @@ harbinger stop
 | Command | Description |
 |---------|-------------|
 | `harbinger monitor` | Start monitoring current repository |
-| `harbinger monitor -d` | Start monitoring in background |
+| `harbinger monitor -d` | Start monitoring in background. Logs are written to `~/.harbinger.<PID>.log` |
+| `harbinger logs [PID]` | Read logs from a specific background monitor process |
 | `harbinger stop` | Stop background monitors |
 | `harbinger resolve` | Manually resolve conflicts |
 
@@ -285,11 +286,11 @@ echo "editor: code" >> ~/.harbinger.yaml
 ### Debug Mode
 
 ```bash
-# Enable verbose logging (future feature)
-harbinger monitor --verbose
+# Check logs for a specific detached process
+harbinger logs $(PID)
 
-# Check logs
-tail -f ~/.harbinger.log
+# Or tail the log file directly
+tail -f ~/.harbinger.<PID>.log
 ```
 
 ## How It Works

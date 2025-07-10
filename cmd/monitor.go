@@ -95,6 +95,17 @@ func runDetachedMonitor() error {
 
 	// Start process in background
 	cmd := exec.Command(exe, args...)
+
+	// Redirect stdout and stderr to a log file
+	logFile, err := os.OpenFile(getLogFileForPID(cmd.Process.Pid), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+	defer logFile.Close() // Close the file when the function exits
+
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
 	setPlatformProcessAttributes(cmd)
 
 	if err := cmd.Start(); err != nil {
@@ -127,4 +138,12 @@ func getPIDFile() string {
 
 func writePIDFile(path string, pid int) error {
 	return os.WriteFile(path, []byte(strconv.Itoa(pid)), 0644)
+}
+
+func getLogFileForPID(pid int) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Sprintf("/tmp/harbinger.%d.log", pid)
+	}
+	return filepath.Join(home, fmt.Sprintf(".harbinger.%d.log", pid))
 }
