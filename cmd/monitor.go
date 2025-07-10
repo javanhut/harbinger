@@ -140,10 +140,4 @@ func writePIDFile(path string, pid int) error {
 	return os.WriteFile(path, []byte(strconv.Itoa(pid)), 0644)
 }
 
-func getLogFileForPID(pid int) string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return fmt.Sprintf("/tmp/harbinger.%d.log", pid)
-	}
-	return filepath.Join(home, fmt.Sprintf(".harbinger.%d.log", pid))
-}
+

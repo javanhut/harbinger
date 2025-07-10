@@ -1,34 +1,12 @@
 package main
 
 import (
-	"fmt"
-	"log"
-	"os"
-
-	"github.com/javanhut/harbinger/pkg/config"
-	"github.com/spf13/cobra"
-)
-
-var (
-	cfgFile string
-	rootCmd = &cobra.Command{
-		Use:   "harbinger",
-		Short: "A Git conflict monitoring tool that notifies you when your branch needs attention",
-		Long: `Harbinger monitors your Git repository in the background and notifies you when:
-- Your branch is out of sync with the remote
-- There are potential merge conflicts
-- Remote changes might affect your work
-
-It provides an interactive conflict resolution interface right in your terminal.`,
-	}
-)
-
-import (
 	"bufio"
 	"fmt"
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 
 	"github.com/javanhut/harbinger/pkg/config"
 	"github.com/spf13/cobra"
@@ -97,9 +75,6 @@ func getLogFileForPID(pid int) string {
 	return filepath.Join(home, fmt.Sprintf(".harbinger.%d.log", pid))
 }
 
-
-
-
 func initConfig() {
 	if cfgFile != "" {
 		config.SetConfigFile(cfgFile)
@@ -119,3 +94,4 @@ func main() {
 		os.Exit(1)
 	}
 }
+

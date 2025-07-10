@@ -1,6 +1,7 @@
 package notify
 
 import (
+	"bytes"
 	"fmt"
 	"log"
 	"os"
@@ -15,7 +16,7 @@ type Notifier struct {
 
 func New() *Notifier {
 	return &Notifier{
-		useDesktopNotifications: checkDesktopNotificationSupport(),
+		useDesktopNotifications: checkDesktopNotificationSupport("/proc/version"),
 	}
 }
 
@@ -56,7 +57,7 @@ func (n *Notifier) sendNotification(title, message string) {
 		exec.Command("osascript", "-e", script).Run()
 	case "linux":
 		// Linux notification (requires notify-send) or WSL notification
-		if isWSL() {
+		if isWSL("/proc/version") {
 			// For WSL, execute the PowerShell script on the Windows host
 			// Get the absolute path to the PowerShell script from the user's home directory
 			homeDir, err := os.UserHomeDir()
@@ -98,13 +99,13 @@ func (n *Notifier) sendNotification(title, message string) {
 	}
 }
 
-func checkDesktopNotificationSupport() bool {
+func checkDesktopNotificationSupport(procVersionPath string) bool {
 	switch runtime.GOOS {
 	case "darwin":
 		return true
 	case "linux":
 		// Check if notify-send is available or if running on WSL
-		if isWSL() {
+		if isWSL(procVersionPath) {
 			return true // We will use PowerShell script for notifications on WSL
 		}
 		if err := exec.Command("which", "notify-send").Run(); err == nil {
@@ -117,9 +118,13 @@ func checkDesktopNotificationSupport() bool {
 }
 
 // isWSL checks if the current environment is Windows Subsystem for Linux
-func isWSL() bool {
+func isWSL(procVersionPath string) bool {
 	if runtime.GOOS == "linux" {
-		if _, err := exec.Command("grep", "-q", "microsoft", "/proc/version").Output(); err == nil {
+		content, err := os.ReadFile(procVersionPath)
+		if err != nil {
+			return false
+		}
+		if bytes.Contains(content, []byte("microsoft")) {
 			return true
 		}
 	}
