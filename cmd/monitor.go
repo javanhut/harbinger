@@ -8,7 +8,6 @@ import (
 	"os/signal"
 	"path/filepath"
 	"strconv"
-	"syscall"
 	"time"
 
 	"github.com/javanhut/harbinger/internal/monitor"
@@ -52,7 +51,7 @@ func runMonitor(cmd *cobra.Command, args []string) error {
 
 	// Setup signal handling
 	sigChan := make(chan os.Signal, 1)
-	signal.Notify(sigChan, os.Interrupt, syscall.SIGTERM)
+	notifySignals(sigChan)
 
 	// Start monitoring
 	if err := m.Start(); err != nil {
@@ -91,9 +90,7 @@ func runDetachedMonitor() error {
 
 	// Start process in background
 	cmd := exec.Command(exe, args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		Setsid: true,
-	}
+	setPlatformProcessAttributes(cmd)
 
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start background process: %w", err)
@@ -114,7 +111,7 @@ func runDetachedMonitor() error {
 func getPIDFile() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return "/tmp/harbinger.pid"
+		return getPIDFileDefaultPath()
 	}
 	return filepath.Join(home, ".harbinger.pid")
 }

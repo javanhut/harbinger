@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"syscall"
 
 	"github.com/spf13/cobra"
 )
@@ -45,8 +44,8 @@ func runStop(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("failed to find process: %w", err)
 	}
 
-	// Send SIGTERM to process
-	if err := process.Signal(syscall.SIGTERM); err != nil {
+	// Send stop signal to process
+	if err := sendStopSignal(process); err != nil {
 		// Process might not exist, remove PID file
 		os.Remove(pidFile)
 		fmt.Println("No background harbinger monitor found")
