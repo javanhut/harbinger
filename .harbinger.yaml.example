@@ -1,0 +1,17 @@
+# Example configuration for Harbinger
+
+# How often to check for remote changes
+poll_interval: 30s
+
+# Your preferred editor for conflict resolution
+# If not set, uses $EDITOR environment variable
+editor: vim
+
+# Enable desktop notifications
+notifications: true
+
+# Branches to ignore (won't monitor these)
+ignore_branches:
+  - main
+  - master
+  - develop
