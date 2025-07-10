@@ -34,6 +34,14 @@ install_binary() {
             cp "./${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
             chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
             echo "${BINARY_NAME} installed successfully to ${INSTALL_DIR}/${BINARY_NAME}"
+
+            # If running on WSL, copy the PowerShell notification script
+            if echo "${PROC_VERSION}" | grep -qi "microsoft"; then
+                HARBINGER_CONFIG_DIR="${HOME}/.harbinger"
+                mkdir -p "${HARBINGER_CONFIG_DIR}"
+                cp "./scripts/windows/notify.ps1" "${HARBINGER_CONFIG_DIR}/notify.ps1"
+                echo "PowerShell notification script copied to ${HARBINGER_CONFIG_DIR}/notify.ps1"
+            fi
             ;;
         MINGW*|MSYS*|CYGWIN*)
             INSTALL_DIR_WIN="${HOME}/bin"

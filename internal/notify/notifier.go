@@ -3,7 +3,9 @@ package notify
 import (
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 )
 
@@ -53,8 +55,22 @@ func (n *Notifier) sendNotification(title, message string) {
 		script := fmt.Sprintf(`display notification "%s" with title "%s"`, message, title)
 		exec.Command("osascript", "-e", script).Run()
 	case "linux":
-		// Linux notification (requires notify-send)
-		exec.Command("notify-send", title, message).Run()
+		// Linux notification (requires notify-send) or WSL notification
+		if isWSL() {
+			// For WSL, execute the PowerShell script on the Windows host
+			// Get the absolute path to the PowerShell script from the user's home directory
+			homeDir, err := os.UserHomeDir()
+			if err != nil {
+				log.Printf("Error getting user home directory: %v", err)
+				return
+			}
+			scriptPath := filepath.Join(homeDir, ".harbinger", "notify.ps1")
+
+			cmd := exec.Command("powershell.exe", "-File", scriptPath, "-Title", title, "-Message", message)
+			cmd.Run()
+		} else {
+			exec.Command("notify-send", title, message).Run()
+		}
 	case "windows":
 		// Windows notification (requires PowerShell)
 		script := fmt.Sprintf(`
@@ -87,12 +103,25 @@ func checkDesktopNotificationSupport() bool {
 	case "darwin":
 		return true
 	case "linux":
-		// Check if notify-send is available
+		// Check if notify-send is available or if running on WSL
+		if isWSL() {
+			return true // We will use PowerShell script for notifications on WSL
+		}
 		if err := exec.Command("which", "notify-send").Run(); err == nil {
 			return true
 		}
 	case "windows":
 		return true
+	}
+	return false
+}
+
+// isWSL checks if the current environment is Windows Subsystem for Linux
+func isWSL() bool {
+	if runtime.GOOS == "linux" {
+		if _, err := exec.Command("grep", "-q", "microsoft", "/proc/version").Output(); err == nil {
+			return true
+		}
 	}
 	return false
 }
