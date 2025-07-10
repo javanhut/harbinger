@@ -1,4 +1,4 @@
-# Harbinger
+# Harbinger - Git branch monitor
 
 A Git conflict monitoring tool that watches your repository in the background and notifies you when your branch needs attention.
 
