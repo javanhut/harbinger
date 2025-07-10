@@ -1,53 +1,77 @@
 #!/usr/bin/env bash
 
-# Harbinger installation script
-
 set -e
 
-echo "Installing Harbinger..."
+BINARY_NAME="harbinger"
+INSTALL_DIR="/usr/local/bin"
 
-# Detect OS
-OS="$(uname -s)"
-ARCH="$(uname -m)"
+# Function to handle installation
+install_binary() {
+    echo "Installing ${BINARY_NAME}..."
+    
+    OS="$(uname -s)"
+    case ${OS} in
+        Linux|Darwin)
+            echo "Detected ${OS}. Installing to ${INSTALL_DIR}"
+            if [ ! -d "${INSTALL_DIR}" ]; then
+                echo "Creating directory ${INSTALL_DIR}"
+                mkdir -p "${INSTALL_DIR}"
+            fi
+            cp "./${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
+            chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
+            echo "${BINARY_NAME} installed successfully to ${INSTALL_DIR}/${BINARY_NAME}"
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            INSTALL_DIR_WIN="${HOME}/bin"
+            echo "Detected Windows. Installing to ${INSTALL_DIR_WIN}"
+            if [ ! -d "${INSTALL_DIR_WIN}" ]; then
+                echo "Creating directory ${INSTALL_DIR_WIN}"
+                mkdir -p "${INSTALL_DIR_WIN}"
+            fi
+            cp "./${BINARY_NAME}.exe" "${INSTALL_DIR_WIN}/${BINARY_NAME}.exe"
+            echo "${BINARY_NAME} installed to ${INSTALL_DIR_WIN}/${BINARY_NAME}.exe"
+            echo "Please ensure this directory is in your system's PATH."
+            ;;
+        *)
+            echo "Unsupported operating system: ${OS}"
+            exit 1
+            ;;
+    esac
+}
 
-case $OS in
-    Darwin)
-        PLATFORM="darwin"
-        ;;
-    Linux)
-        PLATFORM="linux"
-        ;;
-    MINGW* | MSYS* | CYGWIN*)
-        PLATFORM="windows"
-        ;;
-    *)
-        echo "Unsupported operating system: $OS"
-        exit 1
-        ;;
-esac
+# Function to handle uninstallation
+uninstall_binary() {
+    echo "Uninstalling ${BINARY_NAME}..."
 
-case $ARCH in
-    x86_64)
-        ARCH="amd64"
-        ;;
-    arm64 | aarch64)
-        ARCH="arm64"
-        ;;
-    *)
-        echo "Unsupported architecture: $ARCH"
-        exit 1
-        ;;
-esac
+    OS="$(uname -s)"
+    case ${OS} in
+        Linux|Darwin)
+            if [ -f "${INSTALL_DIR}/${BINARY_NAME}" ]; then
+                rm -f "${INSTALL_DIR}/${BINARY_NAME}"
+                echo "${BINARY_NAME} uninstalled from ${INSTALL_DIR}/${BINARY_NAME}"
+            else
+                echo "${BINARY_NAME} not found in ${INSTALL_DIR}. Nothing to do."
+            fi
+            ;;
+        MINGW*|MSYS*|CYGWIN*)
+            INSTALL_DIR_WIN="${HOME}/bin"
+            if [ -f "${INSTALL_DIR_WIN}/${BINARY_NAME}.exe" ]; then
+                rm -f "${INSTALL_DIR_WIN}/${BINARY_NAME}.exe"
+                echo "${BINARY_NAME} uninstalled from ${INSTALL_DIR_WIN}/${BINARY_NAME}.exe"
+            else
+                echo "${BINARY_NAME}.exe not found in ${INSTALL_DIR_WIN}. Nothing to do."
+            fi
+            ;;
+        *)
+            echo "Unsupported operating system: ${OS}"
+            exit 1
+            ;;
+    esac
+}
 
-# Check if go is installed
-if command -v go &> /dev/null; then
-    echo "Go is installed, using go install..."
-    go install github.com/javanhut/harbinger@latest
-    echo "Harbinger installed successfully!"
-    echo "Run 'harbinger --help' to get started"
+# Main script logic
+if [ "$1" == "uninstall" ]; then
+    uninstall_binary
 else
-    echo "Go is not installed. Please install Go from https://golang.org/dl/"
-    echo "Alternatively, download pre-built binaries from:"
-    echo "https://github.com/javanhut/harbinger/releases"
-    exit 1
+    install_binary
 fi

@@ -55,23 +55,22 @@ build-all: clean
 	
 	@echo "All builds complete in $(BUILD_DIR)/"
 
-## install: Install the binary to $GOPATH/bin
+## install: Install the binary (requires sudo)
 .PHONY: install
-install:
+install: build
 	@echo "Installing $(BINARY_NAME)..."
-	@go build $(BUILD_FLAGS) $(LDFLAGS) -o $(BINARY_NAME) $(MAIN_PATH)
-	@mkdir -p $(shell go env GOPATH)/bin
-	@cp $(BINARY_NAME) $(shell go env GOPATH)/bin/$(BINARY_NAME)
-	@rm -f $(BINARY_NAME)
+	@echo "This command requires sudo privileges to install to /usr/local/bin."
+	@echo "Please run \"sudo make install\""
+	@sudo ./scripts/install.sh
 	@echo "Installation complete"
-	@echo "Run this command to add harbinger to your path:"
-	@echo "export PATH=$(shell go env GOPATH)/bin:$PATH"
 
-## uninstall: Remove the binary from $GOPATH/bin
+## uninstall: Remove the binary (requires sudo)
 .PHONY: uninstall
 uninstall:
 	@echo "Uninstalling $(BINARY_NAME)..."
-	@rm -f $(shell go env GOPATH)/bin/$(BINARY_NAME)
+	@echo "This command requires sudo privileges to uninstall from /usr/local/bin."
+	@echo "Please run \"sudo make uninstall\""
+	@sudo ./scripts/install.sh uninstall
 	@echo "Uninstall complete"
 
 ## clean: Clean build artifacts
