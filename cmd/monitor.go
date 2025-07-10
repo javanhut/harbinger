@@ -34,6 +34,13 @@ func init() {
 }
 
 func runMonitor(cmd *cobra.Command, args []string) error {
+	// Resolve repoPath to an absolute path
+	absRepoPath, err := filepath.Abs(repoPath)
+	if err != nil {
+		return fmt.Errorf("failed to get absolute path for repository: %w", err)
+	}
+	repoPath = absRepoPath
+
 	if detach {
 		return runDetachedMonitor()
 	}
@@ -83,9 +90,8 @@ func runDetachedMonitor() error {
 	if pollInterval != 30*time.Second {
 		args = append(args, "--interval", pollInterval.String())
 	}
-	if repoPath != "." {
-		args = append(args, "--path", repoPath)
-	}
+			args = append(args, "--path", repoPath)
+	
 
 	// Start process in background
 	cmd := exec.Command(exe, args...)
