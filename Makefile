@@ -64,6 +64,8 @@ install:
 	@cp $(BINARY_NAME) $(shell go env GOPATH)/bin/$(BINARY_NAME)
 	@rm -f $(BINARY_NAME)
 	@echo "Installation complete"
+	@echo "Run this command to add harbinger to your path:"
+	@echo "export PATH=$(shell go env GOPATH)/bin:$PATH"
 
 ## uninstall: Remove the binary from $GOPATH/bin
 .PHONY: uninstall

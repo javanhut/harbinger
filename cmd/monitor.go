@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"os/exec"
-	"os/signal"
 	"path/filepath"
 	"strconv"
 	"time"
@@ -106,6 +105,10 @@ func runDetachedMonitor() error {
 	fmt.Println("Use 'harbinger stop' to stop the background monitor")
 
 	return nil
+}
+
+func getPIDFileDefaultPath() string {
+	return "/tmp/harbinger.pid"
 }
 
 func getPIDFile() string {

@@ -3,6 +3,7 @@ package git
 import (
 	"bytes"
 	"fmt"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
@@ -87,7 +88,9 @@ func (r *Repository) CheckForConflicts(targetBranch string) ([]Conflict, error) 
 			// Abort the merge
 			abortCmd := exec.Command("git", "merge", "--abort")
 			abortCmd.Dir = r.Path
-			abortCmd.Run()
+			if err := abortCmd.Run(); err != nil {
+				return nil, fmt.Errorf("failed to abort merge: %w", err)
+			}
 
 			return conflicts, nil
 		}
@@ -97,7 +100,9 @@ func (r *Repository) CheckForConflicts(targetBranch string) ([]Conflict, error) 
 	// No conflicts, abort the merge
 	abortCmd := exec.Command("git", "merge", "--abort")
 	abortCmd.Dir = r.Path
-	abortCmd.Run()
+	if err := abortCmd.Run(); err != nil {
+		return nil, fmt.Errorf("failed to abort merge: %w", err)
+	}
 
 	return nil, nil
 }
@@ -130,13 +135,14 @@ func (r *Repository) getConflictedFiles() ([]Conflict, error) {
 
 func (r *Repository) getFileConflict(file string) (*Conflict, error) {
 	// Get the conflict markers from the file
-	cmd := exec.Command("git", "diff", "--no-index", "--no-prefix", "/dev/null", file)
-	cmd.Dir = r.Path
-	output, _ := cmd.Output() // Ignore error as diff returns non-zero for differences
+	content, err := os.ReadFile(filepath.Join(r.Path, file))
+	if err != nil {
+		return nil, fmt.Errorf("failed to read file: %w", err)
+	}
 
 	return &Conflict{
 		File:    file,
-		Content: string(output),
+		Content: string(content),
 	}, nil
 }
 
