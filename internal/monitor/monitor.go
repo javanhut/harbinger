@@ -26,6 +26,8 @@ type Monitor struct {
 	cancel           context.CancelFunc
 	wg               sync.WaitGroup
 	lastRemoteCommit string
+	lastSyncStatus   bool // Track if we were in sync last time
+	currentBranch    string
 }
 
 func New(repoPath string, options Options) (*Monitor, error) {
@@ -112,23 +114,44 @@ func (m *Monitor) checkForChanges() error {
 		return fmt.Errorf("failed to get current branch: %w", err)
 	}
 
-	// Check if remote has changed
-	remoteCommit, err := m.repo.GetRemoteCommit(branch)
+	// Check if we've switched branches
+	if m.currentBranch != "" && m.currentBranch != branch {
+		log.Printf("Switched from branch '%s' to '%s'", m.currentBranch, branch)
+		m.lastRemoteCommit = "" // Reset tracking
+		m.lastSyncStatus = false
+	}
+	m.currentBranch = branch
+
+	// Check sync status
+	inSync, err := m.repo.IsInSync(branch)
 	if err != nil {
 		// Branch might not have upstream
+		log.Printf("Warning: unable to check sync status: %v", err)
 		return nil
 	}
 
-	localCommit, err := m.repo.GetLocalCommit(branch)
-	if err != nil {
-		return fmt.Errorf("failed to get local commit: %w", err)
+	// If we just became in sync, notify with green checkmark
+	if inSync && !m.lastSyncStatus {
+		m.notifier.NotifyInSync(branch)
 	}
 
-	// Check if remote has new changes
-	if remoteCommit != m.lastRemoteCommit && m.lastRemoteCommit != "" {
-		m.notifier.NotifyRemoteChange(branch, remoteCommit)
+	// Check if we're behind remote
+	isBehind, behindCount, err := m.repo.IsBehindRemote(branch)
+	if err != nil {
+		log.Printf("Warning: unable to check if behind remote: %v", err)
+	} else if isBehind {
+		m.notifier.NotifyBehindRemote(branch, behindCount)
 
-		// Check for potential conflicts
+		// Auto-pull if enabled and no uncommitted changes
+		if m.config.AutoPull {
+			if err := m.attemptAutoPull(branch, behindCount); err != nil {
+				log.Printf("Auto-pull failed: %v", err)
+			}
+		}
+	}
+
+	// Check for conflicts if we're not in sync
+	if !inSync {
 		conflicts, err := m.repo.CheckForConflicts(fmt.Sprintf("origin/%s", branch))
 		if err != nil {
 			log.Printf("Error checking for conflicts: %v", err)
@@ -137,12 +160,30 @@ func (m *Monitor) checkForChanges() error {
 		}
 	}
 
-	// Check if local is behind remote
-	if localCommit != remoteCommit {
-		m.notifier.NotifyOutOfSync(branch, localCommit, remoteCommit)
+	m.lastSyncStatus = inSync
+	return nil
+}
+
+func (m *Monitor) attemptAutoPull(branch string, commitCount int) error {
+	// Check if we have uncommitted changes
+	hasChanges, err := m.repo.HasUncommittedChanges()
+	if err != nil {
+		return fmt.Errorf("failed to check for uncommitted changes: %w", err)
 	}
 
-	m.lastRemoteCommit = remoteCommit
+	if hasChanges {
+		log.Printf("Cannot auto-pull: uncommitted changes in working directory")
+		return fmt.Errorf("uncommitted changes prevent auto-pull")
+	}
+
+	// Attempt to pull
+	log.Printf("Auto-pulling %d commit(s) into branch '%s'", commitCount, branch)
+	if err := m.repo.Pull(); err != nil {
+		return fmt.Errorf("pull failed: %w", err)
+	}
+
+	m.notifier.NotifyAutoPull(branch, commitCount)
+	log.Printf("Successfully auto-pulled %d commit(s)", commitCount)
 	return nil
 }
 

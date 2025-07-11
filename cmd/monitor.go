@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"time"
 
 	"github.com/javanhut/harbinger/internal/monitor"
@@ -90,36 +89,42 @@ func runDetachedMonitor() error {
 	if pollInterval != 30*time.Second {
 		args = append(args, "--interval", pollInterval.String())
 	}
-			args = append(args, "--path", repoPath)
-	
+	args = append(args, "--path", repoPath)
 
 	// Start process in background
 	cmd := exec.Command(exe, args...)
 
-	// Redirect stdout and stderr to a log file
-	logFile, err := os.OpenFile(getLogFileForPID(cmd.Process.Pid), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		return fmt.Errorf("failed to open log file: %w", err)
-	}
-	defer logFile.Close() // Close the file when the function exits
-
-	cmd.Stdout = logFile
-	cmd.Stderr = logFile
-
 	setPlatformProcessAttributes(cmd)
 
+	// Start the process first to get the PID
 	if err := cmd.Start(); err != nil {
 		return fmt.Errorf("failed to start background process: %w", err)
 	}
 
+	// Now we have the PID, create the log file
+	logFile, err := os.OpenFile(getLogFileForPID(cmd.Process.Pid), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		// If we can't create log file, kill the process
+		cmd.Process.Kill()
+		return fmt.Errorf("failed to open log file: %w", err)
+	}
+
+	// Write initial log entry
+	fmt.Fprintf(logFile, "[%s] Harbinger monitor started for repository: %s\n", time.Now().Format(time.RFC3339), repoPath)
+	fmt.Fprintf(logFile, "[%s] Polling interval: %s\n", time.Now().Format(time.RFC3339), pollInterval)
+	fmt.Fprintf(logFile, "[%s] Process ID: %d\n", time.Now().Format(time.RFC3339), cmd.Process.Pid)
+	logFile.Close() // Close our reference; the child process will open its own
+
 	// Write PID to file for later stopping
-	pidFile := getPIDFile()
+	pidFile := getPIDFileForRepo(repoPath)
 	if err := writePIDFile(pidFile, cmd.Process.Pid); err != nil {
 		log.Printf("Warning: failed to write PID file: %v", err)
 	}
 
 	fmt.Printf("Running harbinger in background with process ID: %d\n", cmd.Process.Pid)
-	fmt.Println("Use 'harbinger stop' to stop the background monitor")
+	fmt.Printf("Monitoring repository: %s\n", repoPath)
+	fmt.Printf("View logs: harbinger logs %d\n", cmd.Process.Pid)
+	fmt.Printf("Stop monitor: harbinger stop %d\n", cmd.Process.Pid)
 
 	return nil
 }
@@ -136,8 +141,42 @@ func getPIDFile() string {
 	return filepath.Join(home, ".harbinger.pid")
 }
 
-func writePIDFile(path string, pid int) error {
-	return os.WriteFile(path, []byte(strconv.Itoa(pid)), 0644)
+// getPIDFileForRepo returns a repository-specific PID file path
+func getPIDFileForRepo(repoPath string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		home = "/tmp"
+	}
+
+	// Create a safe filename from the repo path
+	safeRepoName := filepath.Base(repoPath)
+	if safeRepoName == "." || safeRepoName == "/" {
+		safeRepoName = "default"
+	}
+
+	// Include a hash of the full path to handle repos with same name
+	hash := fmt.Sprintf("%08x", hashString(repoPath))
+
+	return filepath.Join(home, fmt.Sprintf(".harbinger-%s-%s.pid", safeRepoName, hash[:8]))
 }
 
+// Simple string hash function for generating unique IDs
+func hashString(s string) uint32 {
+	var h uint32 = 2166136261
+	for i := 0; i < len(s); i++ {
+		h = (h ^ uint32(s[i])) * 16777619
+	}
+	return h
+}
 
+func writePIDFile(path string, pid int) error {
+	// Create directory if it doesn't exist
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create PID directory: %w", err)
+	}
+
+	// Write PID and repository path
+	data := fmt.Sprintf("%d\n%s\n", pid, repoPath)
+	return os.WriteFile(path, []byte(data), 0644)
+}

@@ -13,6 +13,7 @@ type Config struct {
 	Notifications  bool     `yaml:"notifications"`
 	IgnoreBranches []string `yaml:"ignore_branches"`
 	AutoResolve    bool     `yaml:"auto_resolve"`
+	AutoPull       bool     `yaml:"auto_pull"`
 }
 
 var (
@@ -39,6 +40,7 @@ func Load() (*Config, error) {
 		Editor:        os.Getenv("EDITOR"),
 		Notifications: true,
 		AutoResolve:   true,
+		AutoPull:      false, // Default to false for safety
 	}
 
 	if configPath == "" || configName == "" {

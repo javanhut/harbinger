@@ -1,50 +1,162 @@
 package notify
 
 import (
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestIsWSL(t *testing.T) {
-	if runtime.GOOS == "linux" {
-		// Create a temporary directory for mock /proc/version files
-		tmpDir, err := ioutil.TempDir("", "wsl_test")
-		assert.NoError(t, err)
-		defer os.RemoveAll(tmpDir)
+	tests := []struct {
+		name     string
+		content  string
+		expected bool
+		goos     string
+	}{
+		{
+			name:     "WSL detected with microsoft in content",
+			content:  "Linux version 5.10.16.3-microsoft-standard-WSL2",
+			expected: true,
+			goos:     "linux",
+		},
+		{
+			name:     "WSL detected with Microsoft (capitalized) in content",
+			content:  "Linux version 5.10.16.3-Microsoft-standard-WSL2",
+			expected: true,
+			goos:     "linux",
+		},
+		{
+			name:     "Regular Linux not detected as WSL",
+			content:  "Linux version 5.4.0-77-generic (buildd@lcy01-amd64-020)",
+			expected: false,
+			goos:     "linux",
+		},
+		{
+			name:     "Non-Linux OS not detected as WSL",
+			content:  "",
+			expected: false,
+			goos:     "darwin",
+		},
+	}
 
-		// Test case: Running on WSL
-		wslProcVersionPath := filepath.Join(tmpDir, "proc_version_wsl")
-		err = ioutil.WriteFile(wslProcVersionPath, []byte("Linux version 5.10.16.3-microsoft-standard-WSL2 (oe-user@oe-host) (GCC version 9.3.0 (Debian 9.3.0-17)) #1 SMP Fri Apr 2 22:23:43 UTC 2021"), 0644)
-		assert.NoError(t, err)
-		assert.True(t, isWSL(wslProcVersionPath), "Should detect WSL")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.goos != runtime.GOOS && tt.goos != "" {
+				t.Skip("Test only applies to " + tt.goos)
+			}
 
-		// Test case: Not running on WSL
-		nonWslProcVersionPath := filepath.Join(tmpDir, "proc_version_non_wsl")
-		err = ioutil.WriteFile(nonWslProcVersionPath, []byte("Linux version 5.4.0-77-generic (buildd@lcy01-amd64-020) (gcc version 9.3.0 (Ubuntu 9.3.0-17ubuntu1~20.04)) #86-Ubuntu SMP Thu Jun 17 02:35:03 UTC 2021"), 0644)
-		assert.NoError(t, err)
-		assert.False(t, isWSL(nonWslProcVersionPath), "Should not detect WSL")
+			tmpDir := t.TempDir()
+			testFile := filepath.Join(tmpDir, "proc_version")
+			
+			if tt.content != "" {
+				err := os.WriteFile(testFile, []byte(tt.content), 0644)
+				require.NoError(t, err)
+			} else {
+				// Test non-existent file
+				testFile = filepath.Join(tmpDir, "non_existent_file")
+			}
 
-		// Test case: /proc/version does not exist
-		assert.False(t, isWSL(filepath.Join(tmpDir, "non_existent_file")), "Should not detect WSL if file does not exist")
-
-	} else {
-		assert.False(t, isWSL(""), "Should not detect WSL on non-Linux OS")
+			result := isWSL(testFile)
+			assert.Equal(t, tt.expected, result)
+		})
 	}
 }
 
-func TestSendNotification_WSL(t *testing.T) {
-	if runtime.GOOS == "linux" && isWSL("/proc/version") {
-		// This test requires a manual verification as it triggers a desktop notification.
-		// It's hard to automate testing of desktop notifications.
-		// You can run this test and observe if a notification appears on your Windows host.
-		notifier := New()
-		notifier.sendNotification("Test Title from WSL", "Test Message from WSL")
-		// Add a small delay to allow the notification to appear
-		// time.Sleep(2 * time.Second)
+func TestNotifier_New(t *testing.T) {
+	notifier := New()
+	assert.NotNil(t, notifier)
+	// We can't easily test the internal useDesktopNotifications field
+	// without making it exported, but we can verify the notifier is created
+}
+
+func TestNotifier_NotificationMethods(t *testing.T) {
+	notifier := New()
+	
+	// These tests verify the methods don't panic and can be called
+	// Actual notification testing would require platform-specific mocking
+	t.Run("NotifyInSync", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			notifier.NotifyInSync("test-branch")
+		})
+	})
+	
+	t.Run("NotifyRemoteChange", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			notifier.NotifyRemoteChange("test-branch", "abc123def456")
+		})
+	})
+	
+	t.Run("NotifyOutOfSync", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			notifier.NotifyOutOfSync("test-branch", "abc123d", "def456g")
+		})
+	})
+	
+	t.Run("NotifyBehindRemote", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			notifier.NotifyBehindRemote("test-branch", 3)
+		})
+	})
+	
+	t.Run("NotifyAutoPull", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			notifier.NotifyAutoPull("test-branch", 2)
+		})
+	})
+	
+	t.Run("NotifyConflicts", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			notifier.NotifyConflicts(2)
+		})
+	})
+}
+
+func TestConvertWSLPathToWindows(t *testing.T) {
+	if runtime.GOOS != "linux" {
+		t.Skip("WSL path conversion only applies to Linux")
+	}
+	
+	notifier := New()
+	
+	// We can't easily test this without actual WSL environment
+	// but we can test that the method exists and handles errors
+	_, err := notifier.convertWSLPathToWindows("/some/path")
+	// This will likely fail in non-WSL environment, which is expected
+	assert.Error(t, err)
+}
+
+func TestCheckDesktopNotificationSupport(t *testing.T) {
+	tests := []struct {
+		name        string
+		goos        string
+		expectTrue  bool
+	}{
+		{
+			name:       "macOS should support notifications",
+			goos:       "darwin", 
+			expectTrue: true,
+		},
+		{
+			name:       "Windows should support notifications",
+			goos:       "windows",
+			expectTrue: true,
+		},
+	}
+	
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if tt.goos != runtime.GOOS {
+				t.Skip("Test only applies to " + tt.goos)
+			}
+			
+			result := checkDesktopNotificationSupport("/proc/version")
+			if tt.expectTrue {
+				assert.True(t, result)
+			}
+		})
 	}
 }

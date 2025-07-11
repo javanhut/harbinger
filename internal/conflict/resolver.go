@@ -37,36 +37,59 @@ func (r *Resolver) ResolveConflicts(conflicts []git.Conflict) error {
 func (r *Resolver) resolveConflict(ui *ui.TerminalUI, conflict git.Conflict, current, total int) error {
 	ui.Clear()
 
-	// Display header
-	color.Cyan("=== Conflict Resolution (%d/%d) ===\n", current, total)
-	color.Yellow("File: %s\n\n", conflict.File)
+	// Display header with box
+	header := fmt.Sprintf("Conflict Resolution (%d/%d)\nFile: %s", current, total, conflict.File)
+	ui.DrawBox(header)
+	fmt.Println()
 
-	// Parse and display conflict
+	// Parse and display conflict with better formatting
 	sections := parseConflict(conflict.Content)
 
 	for _, section := range sections {
 		switch section.Type {
 		case "ours":
-			color.Green("<<<<<<< YOURS\n")
-			fmt.Print(section.Content)
-			color.Green("\n")
+			color.Green("┌─ YOUR CHANGES " + strings.Repeat("─", 30) + "┐")
+			color.Green("│")
+			lines := strings.Split(strings.TrimSpace(section.Content), "\n")
+			for _, line := range lines {
+				color.Green("│ " + line)
+			}
+			color.Green("└" + strings.Repeat("─", 47) + "┘")
+			fmt.Println()
 		case "theirs":
-			color.Red(">>>>>>> THEIRS\n")
-			fmt.Print(section.Content)
-			color.Red("\n")
+			color.Red("┌─ THEIR CHANGES " + strings.Repeat("─", 29) + "┐")
+			color.Red("│")
+			lines := strings.Split(strings.TrimSpace(section.Content), "\n")
+			for _, line := range lines {
+				color.Red("│ " + line)
+			}
+			color.Red("└" + strings.Repeat("─", 47) + "┘")
+			fmt.Println()
 		case "normal":
-			fmt.Print(section.Content)
+			// Show context lines in a muted color
+			if strings.TrimSpace(section.Content) != "" {
+				color.HiBlack("Context:")
+				lines := strings.Split(strings.TrimSpace(section.Content), "\n")
+				for _, line := range lines {
+					color.HiBlack("  " + line)
+				}
+				fmt.Println()
+			}
 		}
 	}
 
-	// Show options
-	fmt.Println("\n" + strings.Repeat("-", 50))
-	fmt.Println("Choose an option:")
-	fmt.Println("  [1] Accept yours")
-	fmt.Println("  [2] Accept theirs")
-	fmt.Println("  [3] Edit in your editor")
-	fmt.Println("  [4] Skip this file")
-	fmt.Print("\nYour choice: ")
+	// Show options in a nice menu
+	fmt.Println(strings.Repeat("═", 50))
+	color.Cyan("What would you like to do?")
+	fmt.Println()
+	color.Green("  [1] ✓ Accept your changes")
+	color.Red("  [2] ✓ Accept their changes")
+	color.Yellow("  [3] ✏️  Edit in your editor")
+	color.HiBlack("  [4] ⏭️  Skip this file")
+	color.Magenta("  [5] 🔍 Show diff")
+	color.Cyan("  [6] ❓ Show help")
+	fmt.Println()
+	color.White("Your choice: ")
 
 	reader := bufio.NewReader(os.Stdin)
 	choice, _ := reader.ReadString('\n')
@@ -80,10 +103,17 @@ func (r *Resolver) resolveConflict(ui *ui.TerminalUI, conflict git.Conflict, cur
 	case "3":
 		return r.editInEditor(conflict.File)
 	case "4":
-		color.Yellow("Skipped %s\n", conflict.File)
+		color.Yellow("⏭️  Skipped %s\n", conflict.File)
 		return nil
+	case "5":
+		r.showDiff(conflict.File)
+		return r.resolveConflict(ui, conflict, current, total)
+	case "6":
+		r.showHelp()
+		return r.resolveConflict(ui, conflict, current, total)
 	default:
-		color.Red("Invalid choice. Please try again.")
+		color.Red("❌ Invalid choice. Please try again.")
+		fmt.Println()
 		return r.resolveConflict(ui, conflict, current, total)
 	}
 }
@@ -127,10 +157,21 @@ func (r *Resolver) acceptTheirs(file string) error {
 func (r *Resolver) editInEditor(file string) error {
 	editor := os.Getenv("EDITOR")
 	if editor == "" {
-		editor = "vi" // Default to vi if no editor is set
+		// Try common editors
+		for _, e := range []string{"code", "vim", "nano", "vi"} {
+			if _, err := exec.LookPath(e); err == nil {
+				editor = e
+				break
+			}
+		}
+		if editor == "" {
+			return fmt.Errorf("no editor found. Please set EDITOR environment variable")
+		}
 	}
 
 	fullPath := filepath.Join(r.repo.Path, file)
+	color.Yellow("🖊️  Opening %s in %s...\n", file, editor)
+
 	cmd := exec.Command(editor, fullPath)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
@@ -140,15 +181,64 @@ func (r *Resolver) editInEditor(file string) error {
 		return fmt.Errorf("failed to open editor: %w", err)
 	}
 
-	// Stage the file
-	cmd = exec.Command("git", "add", file)
-	cmd.Dir = r.repo.Path
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to stage file: %w", err)
+	// Ask if user wants to stage the file
+	fmt.Print("\n🤔 Stage this file? [Y/n]: ")
+	reader := bufio.NewReader(os.Stdin)
+	response, _ := reader.ReadString('\n')
+	response = strings.TrimSpace(strings.ToLower(response))
+
+	if response == "" || response == "y" || response == "yes" {
+		// Stage the file
+		cmd = exec.Command("git", "add", file)
+		cmd.Dir = r.repo.Path
+		if err := cmd.Run(); err != nil {
+			return fmt.Errorf("failed to stage file: %w", err)
+		}
+		color.Green("✓ Edited and staged %s\n", file)
+	} else {
+		color.Yellow("✏️  Edited %s (not staged)\n", file)
 	}
 
-	color.Green("✓ Edited and staged %s\n", file)
 	return nil
+}
+
+func (r *Resolver) showDiff(file string) {
+	color.Cyan("\n🔍 Showing diff for %s:\n", file)
+	cmd := exec.Command("git", "diff", file)
+	cmd.Dir = r.repo.Path
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	cmd.Run()
+	fmt.Println()
+	color.HiBlack("Press Enter to continue...")
+	reader := bufio.NewReader(os.Stdin)
+	reader.ReadString('\n')
+}
+
+func (r *Resolver) showHelp() {
+	color.Cyan("\n📚 Conflict Resolution Help:\n")
+	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+	fmt.Println("When Git finds conflicts, you have several options:")
+	fmt.Println()
+	color.Green("  ✓ Accept Yours:")
+	fmt.Println("    Keep your changes and discard their changes")
+	fmt.Println()
+	color.Red("  ✓ Accept Theirs:")
+	fmt.Println("    Keep their changes and discard your changes")
+	fmt.Println()
+	color.Yellow("  ✏️  Edit in Editor:")
+	fmt.Println("    Open the file in your editor to manually resolve")
+	fmt.Println("    Remove conflict markers and keep desired changes")
+	fmt.Println()
+	color.HiBlack("  ⏭️  Skip:")
+	fmt.Println("    Leave this file unresolved for now")
+	fmt.Println()
+	color.Magenta("  🔍 Show Diff:")
+	fmt.Println("    View the differences between versions")
+	fmt.Println()
+	color.HiBlack("Press Enter to continue...")
+	reader := bufio.NewReader(os.Stdin)
+	reader.ReadString('\n')
 }
 
 type ConflictSection struct {
@@ -165,7 +255,7 @@ func parseConflict(content string) []ConflictSection {
 
 	for _, line := range lines {
 		if strings.HasPrefix(line, "<<<<<<<") {
-			if currentSection.Content != "" {
+			if strings.TrimSpace(currentSection.Content) != "" {
 				sections = append(sections, currentSection)
 			}
 			currentSection = ConflictSection{Type: "ours", Content: ""}
@@ -182,7 +272,7 @@ func parseConflict(content string) []ConflictSection {
 		}
 	}
 
-	if currentSection.Content != "" {
+	if strings.TrimSpace(currentSection.Content) != "" {
 		sections = append(sections, currentSection)
 	}
 
