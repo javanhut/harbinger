@@ -150,7 +150,7 @@ func TestMonitor_ConfigIntegration(t *testing.T) {
 	assert.Equal(t, "30s", monitor.config.PollInterval) // Default from config
 	assert.True(t, monitor.config.Notifications)        // Default should be true
 	assert.True(t, monitor.config.AutoResolve)          // Default should be true
-	assert.False(t, monitor.config.AutoPull)            // Default should be false for safety
+	assert.False(t, monitor.config.AutoSync)            // Default should be false for safety
 }
 
 func TestMonitor_MultipleStartStop(t *testing.T) {

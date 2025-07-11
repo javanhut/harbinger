@@ -79,7 +79,7 @@ func findConflictedFiles(repo *git.Repository) ([]git.Conflict, error) {
 	var conflicts []git.Conflict
 	for _, file := range conflictedFiles {
 		// Read file content
-		fullPath := filepath.Join(repo.Path, file)
+		fullPath := filepath.Join(repo.Path(), file)
 		content, err := os.ReadFile(fullPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to read file %s: %w", file, err)

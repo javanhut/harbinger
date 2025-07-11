@@ -13,7 +13,8 @@ type Config struct {
 	Notifications  bool     `yaml:"notifications"`
 	IgnoreBranches []string `yaml:"ignore_branches"`
 	AutoResolve    bool     `yaml:"auto_resolve"`
-	AutoPull       bool     `yaml:"auto_pull"`
+	AutoSync       bool     `yaml:"auto_sync"`
+	AutoPull       bool     `yaml:"auto_pull"` // Deprecated: use auto_sync instead
 }
 
 var (
@@ -40,7 +41,8 @@ func Load() (*Config, error) {
 		Editor:        os.Getenv("EDITOR"),
 		Notifications: true,
 		AutoResolve:   true,
-		AutoPull:      false, // Default to false for safety
+		AutoSync:      false, // Default to false for safety
+		AutoPull:      false, // Deprecated: kept for backward compatibility
 	}
 
 	if configPath == "" || configName == "" {
@@ -59,6 +61,11 @@ func Load() (*Config, error) {
 
 	if err := yaml.Unmarshal(data, cfg); err != nil {
 		return nil, err
+	}
+
+	// Backward compatibility: if auto_pull is set but auto_sync is not, use auto_pull value
+	if cfg.AutoPull && !cfg.AutoSync {
+		cfg.AutoSync = cfg.AutoPull
 	}
 
 	return cfg, nil

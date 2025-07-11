@@ -25,7 +25,7 @@ func (n *Notifier) NotifyRemoteChange(branch, commit string) {
 	message := fmt.Sprintf("Branch '%s' has new commits on remote\nLatest: %s", branch, commit[:7])
 
 	n.sendNotification(title, message)
-	log.Printf("🔄 %s: %s", title, message)
+	log.Printf("INFO %s: %s", title, message)
 }
 
 func (n *Notifier) NotifyOutOfSync(branch, localCommit, remoteCommit string) {
@@ -34,7 +34,7 @@ func (n *Notifier) NotifyOutOfSync(branch, localCommit, remoteCommit string) {
 		branch, localCommit[:7], remoteCommit[:7])
 
 	n.sendNotification(title, message)
-	log.Printf("⚠️  %s: %s", title, message)
+	log.Printf("WARN %s: %s", title, message)
 }
 
 func (n *Notifier) NotifyConflicts(count int) {
@@ -47,18 +47,18 @@ func (n *Notifier) NotifyConflicts(count int) {
 
 func (n *Notifier) NotifyInSync(branch string) {
 	title := "Branch In Sync"
-	message := fmt.Sprintf("Branch '%s' is up to date with remote ✅", branch)
+	message := fmt.Sprintf("Branch '%s' is up to date with remote", branch)
 
 	n.sendNotification(title, message)
-	log.Printf("✅ %s: %s", title, message)
+	log.Printf("SUCCESS %s: %s", title, message)
 }
 
 func (n *Notifier) NotifyAutoPull(branch string, commitCount int) {
 	title := "Auto-Pull Completed"
-	message := fmt.Sprintf("Pulled %d commit(s) into branch '%s' ⬇️", commitCount, branch)
+	message := fmt.Sprintf("Pulled %d commit(s) into branch '%s'", commitCount, branch)
 
 	n.sendNotification(title, message)
-	log.Printf("⬇️ %s: %s", title, message)
+	log.Printf("SUCCESS %s: %s", title, message)
 }
 
 func (n *Notifier) NotifyBehindRemote(branch string, commitCount int) {
@@ -66,7 +66,7 @@ func (n *Notifier) NotifyBehindRemote(branch string, commitCount int) {
 	message := fmt.Sprintf("Branch '%s' is %d commit(s) behind remote", branch, commitCount)
 
 	n.sendNotification(title, message)
-	log.Printf("⬆️ %s: %s", title, message)
+	log.Printf("INFO %s: %s", title, message)
 }
 
 func (n *Notifier) sendNotification(title, message string) {

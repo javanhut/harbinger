@@ -65,13 +65,13 @@ func runTest(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	color.Green("\n✅ All tests completed successfully!")
+	color.Green("\nAll tests completed successfully!")
 	color.HiBlack("Harbinger should work correctly on your system.")
 	return nil
 }
 
 func testUIComponents(ui *ui.TerminalUI) error {
-	color.Yellow("📱 Testing UI Components...")
+	color.Yellow("Testing UI Components...")
 	fmt.Println()
 
 	// Test terminal clearing
@@ -101,7 +101,7 @@ func testUIComponents(ui *ui.TerminalUI) error {
 
 	// Test unicode symbols
 	fmt.Print("Testing unicode symbols... ")
-	fmt.Print("✅ ❌ ⚠️ 🔄 📱 🎯 ⬇️ ⬆️ 🔍 📝 ⏭️ ")
+	fmt.Print("Testing various symbols and icons: ")
 	color.Green("✓ Unicode works")
 	fmt.Println()
 
@@ -150,7 +150,7 @@ func testNotificationSystem() error {
 	response = strings.TrimSpace(strings.ToLower(response))
 
 	if response == "n" || response == "no" {
-		color.Yellow("⚠️  Notifications may not be working properly on your system.")
+		color.Yellow("Warning: Notifications may not be working properly on your system.")
 		color.HiBlack("This could be due to:")
 		color.HiBlack("  - Notification permissions not granted")
 		color.HiBlack("  - Missing notification system (Linux: install libnotify)")
@@ -165,7 +165,7 @@ func testNotificationSystem() error {
 }
 
 func testConflictResolutionUI() error {
-	color.Yellow("⚔️  Testing Conflict Resolution UI...")
+	color.Yellow("Testing Conflict Resolution UI...")
 	fmt.Println()
 
 	// Create a mock conflict
@@ -241,12 +241,12 @@ func simulateConflictUI(conflict git.Conflict) {
 	fmt.Println(strings.Repeat("═", 50))
 	color.Cyan("What would you like to do?")
 	fmt.Println()
-	color.Green("  [1] ✓ Accept your changes")
-	color.Red("  [2] ✓ Accept their changes")
-	color.Yellow("  [3] ✏️  Edit in your editor")
-	color.HiBlack("  [4] ⏭️  Skip this file")
-	color.Magenta("  [5] 🔍 Show diff")
-	color.Cyan("  [6] ❓ Show help")
+	color.Green("  [1] Accept your changes")
+	color.Red("  [2] Accept their changes")
+	color.Yellow("  [3] Edit in your editor")
+	color.HiBlack("  [4] Skip this file")
+	color.Magenta("  [5] Show diff")
+	color.Cyan("  [6] Show help")
 	fmt.Println()
 	color.White("Your choice (demo mode - any key to continue): ")
 

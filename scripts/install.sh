@@ -34,6 +34,26 @@ install_binary() {
             cp "./${BINARY_NAME}" "${INSTALL_DIR}/${BINARY_NAME}"
             chmod +x "${INSTALL_DIR}/${BINARY_NAME}"
             echo "${BINARY_NAME} installed successfully to ${INSTALL_DIR}/${BINARY_NAME}"
+            
+            # Create default config file if it doesn't exist
+            CONFIG_FILE="${HOME}/.harbinger.yaml"
+            if [ ! -f "${CONFIG_FILE}" ]; then
+                echo "Creating default configuration file at ${CONFIG_FILE}"
+                cat > "${CONFIG_FILE}" << 'EOF'
+# Harbinger configuration file
+poll_interval: 30s          # How often to check for changes
+editor: code                # External editor for conflicts (defaults to $EDITOR if not set)
+notifications: true         # Enable system notifications
+auto_resolve: true          # Auto-launch conflict resolution UI when conflicts detected
+auto_sync: false            # Auto-pull/merge when out of sync (default: false for safety)
+ignore_branches:           # Branches to skip monitoring
+  - main
+  - master
+EOF
+                echo "Default configuration created at ${CONFIG_FILE}"
+            else
+                echo "Configuration file already exists at ${CONFIG_FILE}"
+            fi
 
             # If running on WSL, copy the PowerShell notification script
             if echo "${PROC_VERSION}" | grep -qi "microsoft"; then

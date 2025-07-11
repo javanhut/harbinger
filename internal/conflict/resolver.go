@@ -30,7 +30,7 @@ func (r *Resolver) ResolveConflicts(conflicts []git.Conflict) error {
 		}
 	}
 
-	color.Green("\n✅ All conflicts resolved!")
+	color.Green("\nAll conflicts resolved!")
 	return nil
 }
 
@@ -82,12 +82,12 @@ func (r *Resolver) resolveConflict(ui *ui.TerminalUI, conflict git.Conflict, cur
 	fmt.Println(strings.Repeat("═", 50))
 	color.Cyan("What would you like to do?")
 	fmt.Println()
-	color.Green("  [1] ✓ Accept your changes")
-	color.Red("  [2] ✓ Accept their changes")
-	color.Yellow("  [3] ✏️  Edit in your editor")
-	color.HiBlack("  [4] ⏭️  Skip this file")
-	color.Magenta("  [5] 🔍 Show diff")
-	color.Cyan("  [6] ❓ Show help")
+	color.Green("  [1] Accept your changes")
+	color.Red("  [2] Accept their changes")
+	color.Yellow("  [3] Edit in your editor")
+	color.HiBlack("  [4] Skip this file")
+	color.Magenta("  [5] Show diff")
+	color.Cyan("  [6] Show help")
 	fmt.Println()
 	color.White("Your choice: ")
 
@@ -103,7 +103,7 @@ func (r *Resolver) resolveConflict(ui *ui.TerminalUI, conflict git.Conflict, cur
 	case "3":
 		return r.editInEditor(conflict.File)
 	case "4":
-		color.Yellow("⏭️  Skipped %s\n", conflict.File)
+		color.Yellow("Skipped %s\n", conflict.File)
 		return nil
 	case "5":
 		r.showDiff(conflict.File)
@@ -120,14 +120,14 @@ func (r *Resolver) resolveConflict(ui *ui.TerminalUI, conflict git.Conflict, cur
 
 func (r *Resolver) acceptOurs(file string) error {
 	cmd := exec.Command("git", "checkout", "--ours", file)
-	cmd.Dir = r.repo.Path
+	cmd.Dir = r.repo.Path()
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to accept ours: %w", err)
 	}
 
 	// Stage the file
 	cmd = exec.Command("git", "add", file)
-	cmd.Dir = r.repo.Path
+	cmd.Dir = r.repo.Path()
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to stage file: %w", err)
 	}
@@ -138,14 +138,14 @@ func (r *Resolver) acceptOurs(file string) error {
 
 func (r *Resolver) acceptTheirs(file string) error {
 	cmd := exec.Command("git", "checkout", "--theirs", file)
-	cmd.Dir = r.repo.Path
+	cmd.Dir = r.repo.Path()
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to accept theirs: %w", err)
 	}
 
 	// Stage the file
 	cmd = exec.Command("git", "add", file)
-	cmd.Dir = r.repo.Path
+	cmd.Dir = r.repo.Path()
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to stage file: %w", err)
 	}
@@ -169,8 +169,8 @@ func (r *Resolver) editInEditor(file string) error {
 		}
 	}
 
-	fullPath := filepath.Join(r.repo.Path, file)
-	color.Yellow("🖊️  Opening %s in %s...\n", file, editor)
+	fullPath := filepath.Join(r.repo.Path(), file)
+	color.Yellow("Opening %s in %s...\n", file, editor)
 
 	cmd := exec.Command(editor, fullPath)
 	cmd.Stdin = os.Stdin
@@ -190,22 +190,22 @@ func (r *Resolver) editInEditor(file string) error {
 	if response == "" || response == "y" || response == "yes" {
 		// Stage the file
 		cmd = exec.Command("git", "add", file)
-		cmd.Dir = r.repo.Path
+		cmd.Dir = r.repo.Path()
 		if err := cmd.Run(); err != nil {
 			return fmt.Errorf("failed to stage file: %w", err)
 		}
-		color.Green("✓ Edited and staged %s\n", file)
+		color.Green("Edited and staged %s\n", file)
 	} else {
-		color.Yellow("✏️  Edited %s (not staged)\n", file)
+		color.Yellow("Edited %s (not staged)\n", file)
 	}
 
 	return nil
 }
 
 func (r *Resolver) showDiff(file string) {
-	color.Cyan("\n🔍 Showing diff for %s:\n", file)
+	color.Cyan("\nShowing diff for %s:\n", file)
 	cmd := exec.Command("git", "diff", file)
-	cmd.Dir = r.repo.Path
+	cmd.Dir = r.repo.Path()
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Run()
@@ -216,24 +216,24 @@ func (r *Resolver) showDiff(file string) {
 }
 
 func (r *Resolver) showHelp() {
-	color.Cyan("\n📚 Conflict Resolution Help:\n")
+	color.Cyan("\nConflict Resolution Help:\n")
 	fmt.Println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
 	fmt.Println("When Git finds conflicts, you have several options:")
 	fmt.Println()
-	color.Green("  ✓ Accept Yours:")
+	color.Green("  Accept Yours:")
 	fmt.Println("    Keep your changes and discard their changes")
 	fmt.Println()
-	color.Red("  ✓ Accept Theirs:")
+	color.Red("  Accept Theirs:")
 	fmt.Println("    Keep their changes and discard your changes")
 	fmt.Println()
-	color.Yellow("  ✏️  Edit in Editor:")
+	color.Yellow("  Edit in Editor:")
 	fmt.Println("    Open the file in your editor to manually resolve")
 	fmt.Println("    Remove conflict markers and keep desired changes")
 	fmt.Println()
-	color.HiBlack("  ⏭️  Skip:")
+	color.HiBlack("  Skip:")
 	fmt.Println("    Leave this file unresolved for now")
 	fmt.Println()
-	color.Magenta("  🔍 Show Diff:")
+	color.Magenta("  Show Diff:")
 	fmt.Println("    View the differences between versions")
 	fmt.Println()
 	color.HiBlack("Press Enter to continue...")

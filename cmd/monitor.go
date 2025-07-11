@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/javanhut/harbinger/internal/monitor"
@@ -16,6 +17,7 @@ var (
 	pollInterval time.Duration
 	repoPath     string
 	detach       bool
+	remoteBranch string
 )
 
 var monitorCmd = &cobra.Command{
@@ -30,6 +32,7 @@ func init() {
 	monitorCmd.Flags().DurationVarP(&pollInterval, "interval", "i", 30*time.Second, "Polling interval for checking remote changes")
 	monitorCmd.Flags().StringVarP(&repoPath, "path", "p", ".", "Path to the Git repository to monitor")
 	monitorCmd.Flags().BoolVarP(&detach, "detach", "d", false, "Run monitor in the background")
+	monitorCmd.Flags().StringVarP(&remoteBranch, "remote-branch", "r", "", "Remote branch to monitor (e.g., 'main', 'develop')")
 }
 
 func runMonitor(cmd *cobra.Command, args []string) error {
@@ -49,6 +52,7 @@ func runMonitor(cmd *cobra.Command, args []string) error {
 	// Create monitor
 	m, err := monitor.New(repoPath, monitor.Options{
 		PollInterval: pollInterval,
+		RemoteBranch: remoteBranch,
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create monitor: %w", err)
@@ -90,33 +94,45 @@ func runDetachedMonitor() error {
 		args = append(args, "--interval", pollInterval.String())
 	}
 	args = append(args, "--path", repoPath)
+	if remoteBranch != "" {
+		args = append(args, "--remote-branch", remoteBranch)
+	}
 
 	// Start process in background
 	cmd := exec.Command(exe, args...)
 
 	setPlatformProcessAttributes(cmd)
 
-	// Start the process first to get the PID
+	// Create log file in the user's home directory
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return fmt.Errorf("failed to get home directory: %w", err)
+	}
+
+	// Use a temporary PID for the log file name
+	tempPID := os.Getpid()
+	logPath := filepath.Join(home, fmt.Sprintf(".harbinger.temp.%d.log", tempPID))
+	
+	// Redirect output to log file
+	if err := redirectOutputToLog(cmd, logPath); err != nil {
+		return fmt.Errorf("failed to redirect output: %w", err)
+	}
+
+	// Start the process
 	if err := cmd.Start(); err != nil {
+		os.Remove(logPath)
 		return fmt.Errorf("failed to start background process: %w", err)
 	}
 
-	// Now we have the PID, create the log file
-	logFile, err := os.OpenFile(getLogFileForPID(cmd.Process.Pid), os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
-	if err != nil {
-		// If we can't create log file, kill the process
-		cmd.Process.Kill()
-		return fmt.Errorf("failed to open log file: %w", err)
+	// Now rename the log file with the actual PID
+	actualLogPath := getLogFileForPID(cmd.Process.Pid)
+	if err := os.Rename(logPath, actualLogPath); err != nil {
+		// If rename fails, keep the temp name
+		actualLogPath = logPath
 	}
 
-	// Write initial log entry
-	fmt.Fprintf(logFile, "[%s] Harbinger monitor started for repository: %s\n", time.Now().Format(time.RFC3339), repoPath)
-	fmt.Fprintf(logFile, "[%s] Polling interval: %s\n", time.Now().Format(time.RFC3339), pollInterval)
-	fmt.Fprintf(logFile, "[%s] Process ID: %d\n", time.Now().Format(time.RFC3339), cmd.Process.Pid)
-	logFile.Close() // Close our reference; the child process will open its own
-
 	// Write PID to file for later stopping
-	pidFile := getPIDFileForRepo(repoPath)
+	pidFile := getPIDFileForRepoAndBranch(repoPath, remoteBranch)
 	if err := writePIDFile(pidFile, cmd.Process.Pid); err != nil {
 		log.Printf("Warning: failed to write PID file: %v", err)
 	}
@@ -143,6 +159,11 @@ func getPIDFile() string {
 
 // getPIDFileForRepo returns a repository-specific PID file path
 func getPIDFileForRepo(repoPath string) string {
+	return getPIDFileForRepoAndBranch(repoPath, "")
+}
+
+// getPIDFileForRepoAndBranch returns a repository and branch specific PID file path
+func getPIDFileForRepoAndBranch(repoPath, branch string) string {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		home = "/tmp"
@@ -156,6 +177,13 @@ func getPIDFileForRepo(repoPath string) string {
 
 	// Include a hash of the full path to handle repos with same name
 	hash := fmt.Sprintf("%08x", hashString(repoPath))
+
+	if branch != "" {
+		// Sanitize branch name
+		safeBranch := strings.ReplaceAll(branch, "/", "-")
+		safeBranch = strings.ReplaceAll(safeBranch, ".", "-")
+		return filepath.Join(home, fmt.Sprintf(".harbinger-%s-%s-%s.pid", safeRepoName, hash[:8], safeBranch))
+	}
 
 	return filepath.Join(home, fmt.Sprintf(".harbinger-%s-%s.pid", safeRepoName, hash[:8]))
 }

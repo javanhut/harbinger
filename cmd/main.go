@@ -123,7 +123,25 @@ func initConfig() {
 			log.Fatal(err)
 		}
 		config.SetConfigPath(home)
-		config.SetConfigName(".harbinger")
+		config.SetConfigName(".harbinger.yaml")
+		
+		// Create default config file if it doesn't exist
+		configPath := filepath.Join(home, ".harbinger.yaml")
+		if _, err := os.Stat(configPath); os.IsNotExist(err) {
+			defaultConfig := &config.Config{
+				PollInterval:   "30s",
+				Editor:         "code",
+				Notifications:  true,
+				AutoResolve:    true,
+				AutoSync:       false,
+				IgnoreBranches: []string{"main", "master"},
+			}
+			if err := config.Save(defaultConfig); err != nil {
+				log.Printf("Warning: Failed to create default config file: %v", err)
+			} else {
+				log.Printf("Created default configuration file at %s", configPath)
+			}
+		}
 	}
 }
 

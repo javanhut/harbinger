@@ -12,7 +12,11 @@ import (
 )
 
 type Repository struct {
-	Path string
+	path string
+}
+
+func (r *Repository) Path() string {
+	return r.path
 }
 
 func NewRepository(path string) (*Repository, error) {
@@ -40,7 +44,7 @@ func NewRepository(path string) (*Repository, error) {
 		return nil, fmt.Errorf("not a git repository: %w", err)
 	}
 
-	return &Repository{Path: absPath}, nil
+	return &Repository{path: absPath}, nil
 }
 
 // validateBranchName validates that a branch name is safe to use in git commands
@@ -69,7 +73,7 @@ func validateBranchName(branch string) error {
 
 func (r *Repository) GetCurrentBranch() (string, error) {
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get current branch: %w", err)
@@ -79,7 +83,7 @@ func (r *Repository) GetCurrentBranch() (string, error) {
 
 func (r *Repository) Fetch() error {
 	cmd := exec.Command("git", "fetch", "--all")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to fetch: %w", err)
 	}
@@ -92,7 +96,7 @@ func (r *Repository) GetRemoteCommit(branch string) (string, error) {
 	}
 
 	cmd := exec.Command("git", "rev-parse", fmt.Sprintf("origin/%s", branch))
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get remote commit: %w", err)
@@ -106,7 +110,7 @@ func (r *Repository) GetLocalCommit(branch string) (string, error) {
 	}
 
 	cmd := exec.Command("git", "rev-parse", branch)
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get local commit: %w", err)
@@ -130,7 +134,7 @@ func (r *Repository) CheckForConflicts(targetBranch string) ([]Conflict, error) 
 
 	// Try using git merge-tree (non-destructive)
 	cmd := exec.Command("git", "merge-tree", "--write-tree", "--name-only", currentBranch, targetBranch)
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
@@ -164,7 +168,7 @@ func (r *Repository) CheckForConflicts(targetBranch string) ([]Conflict, error) 
 func (r *Repository) checkConflictsWithDiff(targetBranch string) ([]Conflict, error) {
 	// Get the merge base
 	cmd := exec.Command("git", "merge-base", "HEAD", targetBranch)
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	mergeBase, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get merge base: %w", err)
@@ -173,14 +177,14 @@ func (r *Repository) checkConflictsWithDiff(targetBranch string) ([]Conflict, er
 
 	// Get files changed in both branches since merge base
 	cmd = exec.Command("git", "diff", "--name-only", mergeBaseStr, "HEAD")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	ourFiles, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get our changed files: %w", err)
 	}
 
 	cmd = exec.Command("git", "diff", "--name-only", mergeBaseStr, targetBranch)
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	theirFiles, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get their changed files: %w", err)
@@ -206,15 +210,15 @@ func (r *Repository) checkConflictsWithDiff(targetBranch string) ([]Conflict, er
 	for _, file := range potentialConflicts {
 		// Get the three-way diff to see if there are actual conflicts
 		cmd = exec.Command("git", "show", mergeBaseStr+":"+file)
-		cmd.Dir = r.Path
+		cmd.Dir = r.path
 		baseContent, _ := cmd.Output() // Ignore error if file doesn't exist in base
 
 		cmd = exec.Command("git", "show", "HEAD:"+file)
-		cmd.Dir = r.Path
+		cmd.Dir = r.path
 		ourContent, _ := cmd.Output()
 
 		cmd = exec.Command("git", "show", targetBranch+":"+file)
-		cmd.Dir = r.Path
+		cmd.Dir = r.path
 		theirContent, _ := cmd.Output()
 
 		// Simple conflict detection: if both branches modified the same file differently
@@ -257,7 +261,7 @@ func (r *Repository) parseConflictsFromMergeTree(output string) ([]Conflict, err
 
 func (r *Repository) getConflictedFiles() ([]Conflict, error) {
 	cmd := exec.Command("git", "diff", "--name-only", "--diff-filter=U")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get conflicted files: %w", err)
@@ -283,7 +287,7 @@ func (r *Repository) getConflictedFiles() ([]Conflict, error) {
 
 func (r *Repository) getFileConflict(file string) (*Conflict, error) {
 	// Get the conflict markers from the file
-	content, err := os.ReadFile(filepath.Join(r.Path, file))
+	content, err := os.ReadFile(filepath.Join(r.path, file))
 	if err != nil {
 		return nil, fmt.Errorf("failed to read file: %w", err)
 	}
@@ -296,7 +300,7 @@ func (r *Repository) getFileConflict(file string) (*Conflict, error) {
 
 func (r *Repository) GetConflictedFiles() ([]string, error) {
 	cmd := exec.Command("git", "diff", "--name-only", "--diff-filter=U")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get conflicted files: %w", err)
@@ -354,7 +358,7 @@ func (r *Repository) IsBehindRemote(branch string) (bool, int, error) {
 
 	// Check how many commits we're behind
 	cmd := exec.Command("git", "rev-list", "--count", fmt.Sprintf("%s..origin/%s", branch, branch))
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		// If the command fails, it might be because the remote branch doesn't exist
@@ -381,7 +385,7 @@ func (r *Repository) IsAheadOfRemote(branch string) (bool, int, error) {
 
 	// Check how many commits we're ahead
 	cmd := exec.Command("git", "rev-list", "--count", fmt.Sprintf("origin/%s..%s", branch, branch))
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		// If the command fails, it might be because the remote branch doesn't exist
@@ -403,7 +407,7 @@ func (r *Repository) IsAheadOfRemote(branch string) (bool, int, error) {
 // HasUncommittedChanges checks if there are uncommitted changes
 func (r *Repository) HasUncommittedChanges() (bool, error) {
 	cmd := exec.Command("git", "status", "--porcelain")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return false, fmt.Errorf("failed to check status: %w", err)
@@ -424,13 +428,42 @@ func (r *Repository) Pull() error {
 	}
 
 	cmd := exec.Command("git", "pull")
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("failed to pull: %w - %s", err, stderr.String())
+	}
+
+	return nil
+}
+
+// MergeFromRemote merges from a specific remote branch
+func (r *Repository) MergeFromRemote(remoteBranch string) error {
+	if err := validateBranchName(remoteBranch); err != nil {
+		return fmt.Errorf("invalid remote branch name: %w", err)
+	}
+
+	// Check if we have uncommitted changes
+	hasChanges, err := r.HasUncommittedChanges()
+	if err != nil {
+		return err
+	}
+	if hasChanges {
+		return fmt.Errorf("cannot merge: uncommitted changes in working directory")
+	}
+
+	// Merge from the remote branch
+	cmd := exec.Command("git", "merge", fmt.Sprintf("origin/%s", remoteBranch))
+	cmd.Dir = r.path
+
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to merge from origin/%s: %w - %s", remoteBranch, err, stderr.String())
 	}
 
 	return nil
@@ -443,7 +476,7 @@ func (r *Repository) GetRemoteName(branch string) (string, error) {
 	}
 
 	cmd := exec.Command("git", "config", fmt.Sprintf("branch.%s.remote", branch))
-	cmd.Dir = r.Path
+	cmd.Dir = r.path
 	output, err := cmd.Output()
 	if err != nil {
 		return "origin", nil // Default to origin
