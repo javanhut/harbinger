@@ -83,7 +83,7 @@ func TestValidateBranchName(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			err := validateBranchName(tt.branchName)
-			
+
 			if tt.expectError {
 				assert.Error(t, err)
 				if tt.errorMsg != "" {
@@ -158,7 +158,7 @@ func TestNewRepository_ValidGitRepo(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotNil(t, repo)
 	assert.NotEmpty(t, repo.Path)
-	
+
 	// Verify the path is absolute
 	assert.True(t, filepath.IsAbs(repo.Path))
 }
@@ -249,10 +249,10 @@ func TestParseConflictsFromMergeTree(t *testing.T) {
 	repo := &Repository{Path: "."} // Just for testing the method
 
 	tests := []struct {
-		name           string
-		output         string
-		expectedCount  int
-		expectedFiles  []string
+		name          string
+		output        string
+		expectedCount int
+		expectedFiles []string
 	}{
 		{
 			name:          "no conflicts",

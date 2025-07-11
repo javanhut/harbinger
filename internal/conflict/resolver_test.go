@@ -11,17 +11,17 @@ import (
 func TestNewResolver(t *testing.T) {
 	repo := &git.Repository{Path: "/test/path"}
 	resolver := NewResolver(repo)
-	
+
 	assert.NotNil(t, resolver)
 	assert.Equal(t, repo, resolver.repo)
 }
 
 func TestParseConflict(t *testing.T) {
 	tests := []struct {
-		name            string
-		content         string
+		name             string
+		content          string
 		expectedSections int
-		checkSections   func(t *testing.T, sections []ConflictSection)
+		checkSections    func(t *testing.T, sections []ConflictSection)
 	}{
 		{
 			name: "simple conflict",
@@ -36,13 +36,13 @@ line after conflict`,
 			checkSections: func(t *testing.T, sections []ConflictSection) {
 				assert.Equal(t, "normal", sections[0].Type)
 				assert.Contains(t, sections[0].Content, "line before conflict")
-				
+
 				assert.Equal(t, "ours", sections[1].Type)
 				assert.Contains(t, sections[1].Content, "our change")
-				
+
 				assert.Equal(t, "theirs", sections[2].Type)
 				assert.Contains(t, sections[2].Content, "their change")
-				
+
 				assert.Equal(t, "normal", sections[3].Type)
 				assert.Contains(t, sections[3].Content, "line after conflict")
 			},
@@ -58,7 +58,7 @@ their change only
 			checkSections: func(t *testing.T, sections []ConflictSection) {
 				assert.Equal(t, "ours", sections[0].Type)
 				assert.Contains(t, sections[0].Content, "our change only")
-				
+
 				assert.Equal(t, "theirs", sections[1].Type)
 				assert.Contains(t, sections[1].Content, "their change only")
 			},
@@ -102,8 +102,8 @@ regular file content`,
 			},
 		},
 		{
-			name: "empty content",
-			content: "",
+			name:             "empty content",
+			content:          "",
 			expectedSections: 0,
 			checkSections: func(t *testing.T, sections []ConflictSection) {
 				// No sections expected for empty content
@@ -127,7 +127,7 @@ regular file content`,
 		t.Run(tt.name, func(t *testing.T) {
 			sections := parseConflict(tt.content)
 			assert.Len(t, sections, tt.expectedSections)
-			
+
 			if tt.checkSections != nil {
 				tt.checkSections(t, sections)
 			}
@@ -164,23 +164,23 @@ func main() {
 }`
 
 	sections := parseConflict(complexContent)
-	
+
 	// Should have: normal (before), ours, theirs, normal (after)
 	require.Len(t, sections, 4)
-	
+
 	// Check the structure
 	assert.Equal(t, "normal", sections[0].Type)
 	assert.Contains(t, sections[0].Content, "package main")
 	assert.Contains(t, sections[0].Content, "func main() {")
-	
+
 	assert.Equal(t, "ours", sections[1].Type)
 	assert.Contains(t, sections[1].Content, "Hello from feature branch")
 	assert.Contains(t, sections[1].Content, "Additional line in feature")
-	
+
 	assert.Equal(t, "theirs", sections[2].Type)
 	assert.Contains(t, sections[2].Content, "Hello from main branch")
 	assert.Contains(t, sections[2].Content, "Different additional line")
-	
+
 	assert.Equal(t, "normal", sections[3].Type)
 	assert.Contains(t, sections[3].Content, "Common ending")
 }
@@ -190,25 +190,25 @@ func TestParseConflict_EdgeCases(t *testing.T) {
 		content := `<<<<<<< HEAD
 our change
 ======= missing closing marker`
-		
+
 		sections := parseConflict(content)
 		// Should still parse what it can
 		assert.Greater(t, len(sections), 0)
 	})
-	
+
 	t.Run("nested-like markers", func(t *testing.T) {
 		content := `<<<<<<< HEAD
 content with <<<<<<< in it
 =======
 content with >>>>>>> in it  
 >>>>>>> branch`
-		
+
 		sections := parseConflict(content)
 		assert.Len(t, sections, 2)
 		assert.Equal(t, "ours", sections[0].Type)
 		assert.Equal(t, "theirs", sections[1].Type)
 	})
-	
+
 	t.Run("multiple equals lines", func(t *testing.T) {
 		content := `<<<<<<< HEAD
 our change
@@ -216,7 +216,7 @@ our change
 =======
 their change
 >>>>>>> branch`
-		
+
 		sections := parseConflict(content)
 		// The parser should handle this gracefully
 		assert.Greater(t, len(sections), 0)
@@ -227,11 +227,11 @@ func TestResolver_Integration(t *testing.T) {
 	// Create a mock repository
 	repo := &git.Repository{Path: t.TempDir()}
 	resolver := NewResolver(repo)
-	
+
 	// Verify resolver was created properly
 	assert.NotNil(t, resolver)
 	assert.Equal(t, repo, resolver.repo)
-	
+
 	// Test that we can create conflicts
 	conflict := git.Conflict{
 		File: "test.txt",
@@ -243,11 +243,11 @@ their change
 >>>>>>> branch
 line 2`,
 	}
-	
+
 	// Parse the conflict
 	sections := parseConflict(conflict.Content)
 	assert.Greater(t, len(sections), 0)
-	
+
 	// Verify we have both ours and theirs sections
 	hasOurs := false
 	hasTheirs := false
@@ -259,7 +259,7 @@ line 2`,
 			hasTheirs = true
 		}
 	}
-	
+
 	assert.True(t, hasOurs, "Should have 'ours' section")
 	assert.True(t, hasTheirs, "Should have 'theirs' section")
 }

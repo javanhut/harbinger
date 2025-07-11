@@ -18,7 +18,7 @@ func TestNewTerminalUI(t *testing.T) {
 
 func TestTerminalUI_Clear(t *testing.T) {
 	ui := NewTerminalUI()
-	
+
 	// Capture stdout to verify clear command is executed
 	oldStdout := os.Stdout
 	r, w, _ := os.Pipe()
@@ -99,9 +99,9 @@ func TestTerminalUI_DrawBox(t *testing.T) {
 			os.Stdout = oldStdout
 
 			lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-			
+
 			assert.Equal(t, len(tt.expected), len(lines), "Number of output lines should match expected")
-			
+
 			for i, expectedLine := range tt.expected {
 				if i < len(lines) {
 					assert.Equal(t, expectedLine, lines[i], "Line %d should match", i+1)
@@ -228,7 +228,7 @@ func TestTerminalUI_Integration(t *testing.T) {
 	os.Stdout = oldStdout
 
 	outputStr := string(output)
-	
+
 	// Verify clear was called (platform-specific behavior)
 	if runtime.GOOS == "windows" {
 		// On Windows, clear might not produce visible output in test
@@ -237,7 +237,7 @@ func TestTerminalUI_Integration(t *testing.T) {
 		// On Unix-like systems, we expect some output
 		assert.NotEmpty(t, outputStr)
 	}
-	
+
 	// Verify box drawing
 	assert.Contains(t, outputStr, "┌")
 	assert.Contains(t, outputStr, "└")
